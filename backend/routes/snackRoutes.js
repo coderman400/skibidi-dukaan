@@ -48,7 +48,7 @@ router.post('/create', authMiddleware,upload.single('image'), async (req, res) =
 router.get('/', async (req, res) => {
     try {
         const snacks = await Snack.find({ quantity: { $gt: 0 } })
-            .populate('enlistedBy', 'name'); // Populate enlistedBy with only the name field
+            .populate('enlistedBy', 'name roomNo'); // Populate enlistedBy with only the name field
         
         res.json(snacks);
     } catch (error) {
