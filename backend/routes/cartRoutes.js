@@ -135,13 +135,9 @@ router.post('/checkout', async (req, res) => {
                 totalAmount += snack.price * item.quantity;
             }
 
-            // Construct seller message
+            // Construct seller message - Adding buyer phone number for all sellers
             let message = `📦 New Order Received!\nItems: ${orderSummary.join(', ')}\n`;
-            if (orderData.hasDeliverable) {
-                message += `Buyer: ${buyerName}, Room No: ${buyerRoom}, Phone No: ${buyerPhone}\n`;
-            } else {
-                message += `Buyer: ${buyerName}`;
-            }
+            message += `Buyer: ${buyerName}, Room No: ${buyerRoom}, Phone No: ${buyerPhone}\n`;
             console.log(message);
 
             // Send WhatsApp Notification to seller
