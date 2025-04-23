@@ -9,6 +9,10 @@ const NodeCache = require('node-cache');
 
 const router = express.Router();
 
+// Blacklist array of phone numbers that are not allowed to checkout
+// In a production environment, you might want to store this in your database
+const BLACKLISTED_PHONE_NUMBERS = ['8273693293'];
+
 router.post('/validate', async (req, res) => {
     try {
         const { id, quantity } = req.body;
@@ -38,6 +42,14 @@ router.post('/checkout', async (req, res) => {
         const buyerName = customerInfo.name;
         const buyerRoom = customerInfo.roomNumber || 'Not Available';
         const buyerPhone = customerInfo.phoneNumber || 'Not Available';
+
+        // Check if the phone number is blacklisted
+        if (BLACKLISTED_PHONE_NUMBERS.includes(buyerPhone)) {
+            return res.status(403).json({ 
+                message: 'This phone number is not allowed to place orders',
+                blacklisted: true
+            });
+        }
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: 'Order must have at least one item' });
@@ -276,6 +288,70 @@ router.post('/checkout', async (req, res) => {
         }
 
         res.json({ message: 'Checkout complete', deliverable, nonDeliverable });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
+// Add a blacklist management route
+router.post('/blacklist/add', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({ message: 'Phone number is required' });
+        }
+        
+        // For this simple implementation, we'll just check if it's already in the array
+        if (BLACKLISTED_PHONE_NUMBERS.includes(phoneNumber)) {
+            return res.status(400).json({ message: 'Phone number is already blacklisted' });
+        }
+        
+        // Add to the blacklist
+        BLACKLISTED_PHONE_NUMBERS.push(phoneNumber);
+        
+        res.status(201).json({ 
+            message: 'Phone number added to blacklist', 
+            blacklist: BLACKLISTED_PHONE_NUMBERS 
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
+// Remove from blacklist route
+router.post('/blacklist/remove', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({ message: 'Phone number is required' });
+        }
+        
+        const index = BLACKLISTED_PHONE_NUMBERS.indexOf(phoneNumber);
+        if (index === -1) {
+            return res.status(400).json({ message: 'Phone number is not in the blacklist' });
+        }
+        
+        // Remove from the blacklist
+        BLACKLISTED_PHONE_NUMBERS.splice(index, 1);
+        
+        res.status(200).json({ 
+            message: 'Phone number removed from blacklist', 
+            blacklist: BLACKLISTED_PHONE_NUMBERS 
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
+// Get all blacklisted numbers route
+router.get('/blacklist', async (req, res) => {
+    try {
+        res.status(200).json({ blacklist: BLACKLISTED_PHONE_NUMBERS });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
