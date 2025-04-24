@@ -20,6 +20,18 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something went wrong', error: err.message });
 });
 
+app.use((req, res, next) => {
+    const allowedOrigin = 'https://skibidi-dukaan-chi.vercel.app';
+    const origin = req.headers.origin;
+    
+    if (origin === allowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+      return next();
+    }
+  
+    res.status(403).json({ error: 'CORS policy: Access denied' });
+  });
+
 
 // Routes
 app.use('/auth', require('./routes/auth'));

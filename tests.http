@@ -6,6 +6,9 @@ Content-Type: application/json
   "reason": "Suspicious activity - multiple canceled orders"
 }
 
+###
+GET https://skibidi-dukaan.onrender.com/cart/blacklist
+
 ### remove numbers
 POST http://localhost:8080/cart/blacklist/remove
 Content-Type: application/json
