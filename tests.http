@@ -1,1 +1,23 @@
-GET https://skibidi-dukaan.onrender.com/snacks
+POST http://localhost:8080/cart/blacklist/add
+Content-Type: application/json
+
+{
+  "phoneNumber": "8885226526",
+  "reason": "Suspicious activity - multiple canceled orders"
+}
+
+### remove numbers
+POST http://localhost:8080/cart/blacklist/remove
+Content-Type: application/json
+
+{
+  "phoneNumber": "9876543210"
+}
+
+### otp tests
+POST http://localhost:8080/otp/send-otp
+Content-Type: application/json
+
+{
+  "phoneNo": "8885226526"
+}
