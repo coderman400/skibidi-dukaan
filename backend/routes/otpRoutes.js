@@ -1,7 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const { sendNotif } = require('../controllers/whatsappService');
-const Otp = require('../models/Otp'); // Import Mongo model
+const Otp = require('../models/Otp');
+const BlacklistedNumber = require('../models/BlackListedNumber'); // Import blacklist model
 
 const router = express.Router();
 
@@ -9,11 +10,26 @@ function generateOTP() {
     return crypto.randomInt(100000, 999999).toString();
 }
 
+// Helper function to check if a number is blacklisted
+async function isBlacklisted(phoneNo) {
+    const blacklistedNumber = await BlacklistedNumber.findOne({ phoneNumber: phoneNo });
+    return !!blacklistedNumber;
+}
+
 // 1️⃣ Send OTP
 router.post('/send-otp', async (req, res) => {
     try {
         const { phoneNo } = req.body;
         if (!phoneNo) return res.status(400).json({ error: 'Phone number is required' });
+        
+        // Check if the phone number is blacklisted
+        if (await isBlacklisted(phoneNo)) {
+            return res.status(403).json({
+                success: false,
+                error: 'This phone number has been blacklisted',
+                blacklisted: true
+            });
+        }
 
         const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
@@ -44,10 +60,25 @@ router.post('/verify-otp', async (req, res) => {
     try {
         const { phoneNo, otp } = req.body;
         if (!phoneNo || !otp) return res.status(400).json({ error: 'Phone and OTP are required' });
+        
+        // Check if the phone number is blacklisted
+        if (await isBlacklisted(phoneNo)) {
+            return res.status(403).json({
+                success: false,
+                error: 'This phone number has been blacklisted',
+                blacklisted: true
+            });
+        }
 
         const otpRecord = await Otp.findOne({ phone: phoneNo });
 
         if (!otpRecord) return res.status(400).json({ error: 'OTP expired or not found' });
+        
+        // Check expiration
+        if (new Date() > otpRecord.expiresAt) {
+            await Otp.deleteOne({ phone: phoneNo }); // Clean up expired OTP
+            return res.status(400).json({ error: 'OTP has expired' });
+        }
 
         if (otpRecord.otp !== otp) return res.status(400).json({ error: 'Invalid OTP' });
 
