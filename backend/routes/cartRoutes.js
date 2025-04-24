@@ -2,16 +2,13 @@ const express = require('express');
 const Snack = require('../models/Snack');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const BlacklistedNumber = require('../models/BlackListedNumber')
 const { useMongooseAuthState } = require('../controllers/use-mongoose-auth-state');
 const { default: makeWASocket } = require('baileys');
 const P = require('pino');
 const NodeCache = require('node-cache');
 
 const router = express.Router();
-
-// Blacklist array of phone numbers that are not allowed to checkout
-// In a production environment, you might want to store this in your database
-const BLACKLISTED_PHONE_NUMBERS = ['8273693293','8885226526'];
 
 router.post('/validate', async (req, res) => {
     try {
@@ -43,8 +40,9 @@ router.post('/checkout', async (req, res) => {
         const buyerRoom = customerInfo.roomNumber || 'Not Available';
         const buyerPhone = customerInfo.phoneNumber || 'Not Available';
 
-        // Check if the phone number is blacklisted
-        if (BLACKLISTED_PHONE_NUMBERS.includes(buyerPhone)) {
+        // Check if the phone number is blacklisted using MongoDB
+        const blacklistedNumber = await BlacklistedNumber.findOne({ phoneNumber: buyerPhone });
+        if (blacklistedNumber) {
             return res.status(403).json({ 
                 message: 'This phone number is not allowed to place orders',
                 blacklisted: true
@@ -294,26 +292,37 @@ router.post('/checkout', async (req, res) => {
     }
 });
 
-// Add a blacklist management route
+// Update blacklist management routes to use MongoDB
+
+// Add a phone number to blacklist
 router.post('/blacklist/add', async (req, res) => {
     try {
-        const { phoneNumber } = req.body;
+        const { phoneNumber, reason } = req.body;
         
         if (!phoneNumber) {
             return res.status(400).json({ message: 'Phone number is required' });
         }
         
-        // For this simple implementation, we'll just check if it's already in the array
-        if (BLACKLISTED_PHONE_NUMBERS.includes(phoneNumber)) {
+        // Check if already blacklisted
+        const existingEntry = await BlacklistedNumber.findOne({ phoneNumber });
+        if (existingEntry) {
             return res.status(400).json({ message: 'Phone number is already blacklisted' });
         }
         
-        // Add to the blacklist
-        BLACKLISTED_PHONE_NUMBERS.push(phoneNumber);
+        // Create new blacklist entry
+        const blacklistedNumber = new BlacklistedNumber({
+            phoneNumber,
+            reason: reason || 'Not specified'
+        });
+        
+        await blacklistedNumber.save();
+        
+        // Get all blacklisted numbers to return in response
+        const allBlacklisted = await BlacklistedNumber.find().select('phoneNumber reason blacklistedAt');
         
         res.status(201).json({ 
             message: 'Phone number added to blacklist', 
-            blacklist: BLACKLISTED_PHONE_NUMBERS 
+            blacklist: allBlacklisted 
         });
     } catch (error) {
         console.error(error);
@@ -330,17 +339,18 @@ router.post('/blacklist/remove', async (req, res) => {
             return res.status(400).json({ message: 'Phone number is required' });
         }
         
-        const index = BLACKLISTED_PHONE_NUMBERS.indexOf(phoneNumber);
-        if (index === -1) {
+        // Find and remove the blacklisted number
+        const result = await BlacklistedNumber.findOneAndDelete({ phoneNumber });
+        if (!result) {
             return res.status(400).json({ message: 'Phone number is not in the blacklist' });
         }
         
-        // Remove from the blacklist
-        BLACKLISTED_PHONE_NUMBERS.splice(index, 1);
+        // Get updated blacklist
+        const updatedBlacklist = await BlacklistedNumber.find().select('phoneNumber reason blacklistedAt');
         
         res.status(200).json({ 
             message: 'Phone number removed from blacklist', 
-            blacklist: BLACKLISTED_PHONE_NUMBERS 
+            blacklist: updatedBlacklist 
         });
     } catch (error) {
         console.error(error);
@@ -351,7 +361,8 @@ router.post('/blacklist/remove', async (req, res) => {
 // Get all blacklisted numbers route
 router.get('/blacklist', async (req, res) => {
     try {
-        res.status(200).json({ blacklist: BLACKLISTED_PHONE_NUMBERS });
+        const blacklist = await BlacklistedNumber.find().select('phoneNumber reason blacklistedAt');
+        res.status(200).json({ blacklist });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
