@@ -11,7 +11,7 @@ const router = express.Router();
 
 // Blacklist array of phone numbers that are not allowed to checkout
 // In a production environment, you might want to store this in your database
-const BLACKLISTED_PHONE_NUMBERS = ['8273693293'];
+const BLACKLISTED_PHONE_NUMBERS = ['8273693293','8885226526'];
 
 router.post('/validate', async (req, res) => {
     try {
